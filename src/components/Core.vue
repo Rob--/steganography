@@ -106,7 +106,7 @@ export default {
     getImageBits(file, canvas, maxPixels, ignoreAlpha = false) {
       let bits = [];
 
-      for (let i = 0; i < 400; i += 1) {
+      for (let i = 0; i < 10; i += 1) {
         const { x, y } = this.getNthCoordinate(i, file);
         const pixel = this.getPixel(x, y, canvas);
         bits = [...bits, ...this.getPixelBits(pixel, ignoreAlpha)];
@@ -156,57 +156,79 @@ export default {
           (as 0b10 would extract a value of 2 instead of 1 and our equality check of !== would fail).
         */
 
-        if (this.lsbCount === 1) {
-          if (bits[i] !== (r & 0b01)) {
-            r ^= 0b01;
+        // Iterate over every channel and apply encoding dynamically depending on LSB count
+        const channels = [r, g, b, a].map((channel, index) => {
+          for (let k = 0; k < this.lsbCount; k++) {
+            // We want to encode the greatest LSB first hence, e.g. if LSB count is 2
+            // 2 - 1 - k produces (1, 0) for the mask indexes which generate (0b10, 0b01)
+            const mask = this.getMask(this.lsbCount - 1 - k);
+
+            // Calculate the necessary index for the bit, just iterates from 0 to bits.length
+            // over the life span of all the loops
+            const bit = bits[i + (index * this.lsbCount) + k];
+
+            // (channel & mask) extracts the bit we want,
+            // bit shift moves it to LSB column (e.g. if we extract 2nd LSB index we get 0b10 which is 2),
+            // bit shift that to 0b01 and we get 1 (bit to be set is either 1 or 0)
+            if (bit !== ((channel & mask) >> (1 - k))) {
+              channel ^= mask;
+            }
           }
 
-          if (bits[i + 1] !== (g & 0b01)) {
-            g ^= 0b01;
-          }
+          return channel;
+        });
 
-          if (bits[i + 2] !== (b & 0b01)) {
-            b ^= 0b01;
-          }
+        // if (this.lsbCount === 1) {
+        //   if (bits[i] !== (r & 0b01)) {
+        //     r ^= 0b01;
+        //   }
 
-          if (bits[i + 3] !== (a & 0b01)) {
-            a ^= 0b01;
-          }
-        }
+        //   if (bits[i + 1] !== (g & 0b01)) {
+        //     g ^= 0b01;
+        //   }
 
-        if (this.lsbCount === 2) {
-          if (bits[i] !== ((r & 0b10) >> 1)) {
-            r ^= 0b10;
-          }
+        //   if (bits[i + 2] !== (b & 0b01)) {
+        //     b ^= 0b01;
+        //   }
 
-          if (bits[i + 1] !== (r & 0b01)) {
-            r ^= 0b01;
-          }
+        //   if (bits[i + 3] !== (a & 0b01)) {
+        //     a ^= 0b01;
+        //   }
+        // }
 
-          if (bits[i + 2] !== ((g & 0b10) >> 1)) {
-            g ^= 0b10;
-          }
+        // if (this.lsbCount === 2) {
+        //   if (bits[i] !== ((r & 0b10) >> 1)) {
+        //     r ^= 0b10;
+        //   }
 
-          if (bits[i + 3] !== (g & 0b01)) {
-            g ^= 0b01;
-          }
+        //   if (bits[i + 1] !== (r & 0b01)) {
+        //     r ^= 0b01;
+        //   }
 
-          if (bits[i + 4] !== ((b & 0b10) >> 1)) {
-            b ^= 0b10;
-          }
+        //   if (bits[i + 2] !== ((g & 0b10) >> 1)) {
+        //     g ^= 0b10;
+        //   }
 
-          if (bits[i + 5] !== (b & 0b01)) {
-            b ^= 0b01;
-          }
+        //   if (bits[i + 3] !== (g & 0b01)) {
+        //     g ^= 0b01;
+        //   }
 
-          if (bits[i + 6] !== ((a & 0b10) >> 1)) {
-            a ^= 0b10;
-          }
+        //   if (bits[i + 4] !== ((b & 0b10) >> 1)) {
+        //     b ^= 0b10;
+        //   }
 
-          if (bits[i + 7] !== (a & 0b01)) {
-            a ^= 0b01;
-          }
-        }
+        //   if (bits[i + 5] !== (b & 0b01)) {
+        //     b ^= 0b01;
+        //   }
+
+        //   if (bits[i + 6] !== ((a & 0b10) >> 1)) {
+        //     a ^= 0b10;
+        //   }
+
+        //   if (bits[i + 7] !== (a & 0b01)) {
+        //     a ^= 0b01;
+        //   }
+        // }
 
         // const newPixel = {
         //   r: r & (mask ^ bits[i]),
@@ -215,7 +237,12 @@ export default {
         //   a: a & (mask ^ bits[i + 3]),
         // };
 
-        this.setPixel(x, y, this.canvas.new, { r, g, b, a });
+        this.setPixel(x, y, this.canvas.new, {
+          r: channels[0],
+          g: channels[1],
+          b: channels[2],
+          a: channels[3],
+        });
       }
 
       this.decode();
