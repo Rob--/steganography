@@ -170,72 +170,13 @@ export default {
             // (channel & mask) extracts the bit we want,
             // bit shift moves it to LSB column (e.g. if we extract 2nd LSB index we get 0b10 which is 2),
             // bit shift that to 0b01 and we get 1 (bit to be set is either 1 or 0)
-            if (bit !== ((channel & mask) >> (1 - k))) {
+            if (bit !== ((channel & mask) >> (this.lsbCount - 1 - k))) {
               channel ^= mask;
             }
           }
 
           return channel;
         });
-
-        // if (this.lsbCount === 1) {
-        //   if (bits[i] !== (r & 0b01)) {
-        //     r ^= 0b01;
-        //   }
-
-        //   if (bits[i + 1] !== (g & 0b01)) {
-        //     g ^= 0b01;
-        //   }
-
-        //   if (bits[i + 2] !== (b & 0b01)) {
-        //     b ^= 0b01;
-        //   }
-
-        //   if (bits[i + 3] !== (a & 0b01)) {
-        //     a ^= 0b01;
-        //   }
-        // }
-
-        // if (this.lsbCount === 2) {
-        //   if (bits[i] !== ((r & 0b10) >> 1)) {
-        //     r ^= 0b10;
-        //   }
-
-        //   if (bits[i + 1] !== (r & 0b01)) {
-        //     r ^= 0b01;
-        //   }
-
-        //   if (bits[i + 2] !== ((g & 0b10) >> 1)) {
-        //     g ^= 0b10;
-        //   }
-
-        //   if (bits[i + 3] !== (g & 0b01)) {
-        //     g ^= 0b01;
-        //   }
-
-        //   if (bits[i + 4] !== ((b & 0b10) >> 1)) {
-        //     b ^= 0b10;
-        //   }
-
-        //   if (bits[i + 5] !== (b & 0b01)) {
-        //     b ^= 0b01;
-        //   }
-
-        //   if (bits[i + 6] !== ((a & 0b10) >> 1)) {
-        //     a ^= 0b10;
-        //   }
-
-        //   if (bits[i + 7] !== (a & 0b01)) {
-        //     a ^= 0b01;
-        //   }
-        // }
-
-        // const newPixel = {
-        //   r: r & (mask ^ bits[i]),
-        //   g: g & (mask ^ bits[i + 1]),
-        //   b: b & (mask ^ bits[i + 2]),
-        //   a: a & (mask ^ bits[i + 3]),
-        // };
 
         this.setPixel(x, y, this.canvas.new, {
           r: channels[0],
@@ -253,23 +194,13 @@ export default {
         const { x, y } = this.getNthCoordinate(i, this.host);
         const { r, g, b, a } = this.getPixel(x, y, this.canvas.new);
 
-        if (this.lsbCount === 1) {
-          bits.push(r & 0b01);
-          bits.push(g & 0b01);
-          bits.push(b & 0b01);
-          bits.push(a & 0b01);
-        }
-
-        if (this.lsbCount === 2) {
-          bits.push((r & 0b10) >> 1);
-          bits.push(r & 0b01);
-          bits.push((g & 0b10) >> 1);
-          bits.push(g & 0b01);
-          bits.push((b & 0b10) >> 1);
-          bits.push(b & 0b01);
-          bits.push((a & 0b10) >> 1);
-          bits.push(a & 0b01);
-        }
+        [r, g, b, a].forEach((channel, index) => {
+          for (let j = 0; j < this.lsbCount; j += 1) {
+            const mask = this.getMask(this.lsbCount - 1 - j);
+            
+            bits.push((channel & mask) >> (this.lsbCount - 1 - j));
+          }
+        });
       }
 
       console.log('decode', bits);
