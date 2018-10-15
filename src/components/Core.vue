@@ -25,7 +25,7 @@ export default {
       height: 0,
       width: 0,
       maxBits: 0,
-      lsbCount: 1,
+      lsbCount: 2,
     };
   },
   mounted() {
@@ -106,7 +106,7 @@ export default {
     getImageBits(file, canvas, maxPixels, ignoreAlpha = false) {
       let bits = [];
 
-      for (let i = 0; i < 8000; i += 1) {
+      for (let i = 0; i < 400; i += 1) {
         const { x, y } = this.getNthCoordinate(i, file);
         const pixel = this.getPixel(x, y, canvas);
         bits = [...bits, ...this.getPixelBits(pixel, ignoreAlpha)];
@@ -122,36 +122,90 @@ export default {
     },
     encode() {
       const bitsPerByte = 8;
-      const numberOfLSB = 1;
-      const pixelsPerByte = (bitsPerByte / numberOfLSB);
+      const pixelsPerByte = (bitsPerByte / this.lsbCount);
       const maxPixels = Math.floor((this.host.width * this.host.height) / pixelsPerByte);
 
       const bits = this.getImageBits(this.asset, this.canvas.asset, maxPixels);
       console.log('encode', bits);
       this.maxBits = bits.length;
-      // const mask = this.getMask(1);
 
-      for (let i = 0, j = 0; i < bits.length; i += 4, j += 1) {
+      for (let i = 0, j = 0; i < bits.length; i += (4 * this.lsbCount), j += 1) {
         const { x, y } = this.getNthCoordinate(j, this.host);
         let { r, g, b, a } = this.getPixel(x, y, this.canvas.host);
 
-        const mask = this.getMask(0);
+        /*
+          Every pixel contains 4 channels that describe the colour (rgba).
+          Each channel is 1 byte (8 bits = 0b00000000).
+          Therefore we can make use of the least significant bits (LSBs) of each
+          channel by storing our own data inside the LSBS.
+          Imagine a single channel (red for example), has the value 125.
+          125 in binary is 0b1111101, by editing the least significant bit to store a single
+          bit of data, we fluctuate the value of 125 to 124 (0b1111100) by clearing the LSB,
+          and at most we increase the value by 1 if the LSB was already 0.
 
-        // if lsb's don't match, toggle bit
-        if (bits[i] !== (r & mask)) {
-          r ^= mask;
+          We can also use this method to take advantage of the 2 least significant bits
+          that will ultimately result in a maximum fluctuation of either positive or negative 3
+          as 0b11 = 3.
+
+          To take advantage of 1 lsb:
+          We just check if the value of the LSB is the same value as the bit we
+          want to store, if not we flip the singular bit via bitwise operations.
+
+          To take advantage of 2 lsb:
+          We use a mask 0f 0b10 instead of 0b01, and shift bitwise shift right by 1 place
+          (as 0b10 would extract a value of 2 instead of 1 and our equality check of !== would fail).
+        */
+
+        if (this.lsbCount === 1) {
+          if (bits[i] !== (r & 0b01)) {
+            r ^= 0b01;
+          }
+
+          if (bits[i + 1] !== (g & 0b01)) {
+            g ^= 0b01;
+          }
+
+          if (bits[i + 2] !== (b & 0b01)) {
+            b ^= 0b01;
+          }
+
+          if (bits[i + 3] !== (a & 0b01)) {
+            a ^= 0b01;
+          }
         }
 
-        if (bits[i + 1] !== (g & mask)) {
-          g ^= mask;
-        }
+        if (this.lsbCount === 2) {
+          if (bits[i] !== ((r & 0b10) >> 1)) {
+            r ^= 0b10;
+          }
 
-        if (bits[i + 2] !== (b & mask)) {
-          b ^= mask;
-        }
+          if (bits[i + 1] !== (r & 0b01)) {
+            r ^= 0b01;
+          }
 
-        if (bits[i + 3] !== (a & mask)) {
-          a ^= mask;
+          if (bits[i + 2] !== ((g & 0b10) >> 1)) {
+            g ^= 0b10;
+          }
+
+          if (bits[i + 3] !== (g & 0b01)) {
+            g ^= 0b01;
+          }
+
+          if (bits[i + 4] !== ((b & 0b10) >> 1)) {
+            b ^= 0b10;
+          }
+
+          if (bits[i + 5] !== (b & 0b01)) {
+            b ^= 0b01;
+          }
+
+          if (bits[i + 6] !== ((a & 0b10) >> 1)) {
+            a ^= 0b10;
+          }
+
+          if (bits[i + 7] !== (a & 0b01)) {
+            a ^= 0b01;
+          }
         }
 
         // const newPixel = {
@@ -168,14 +222,27 @@ export default {
     },
     decode() {
       const bits = [];
-      for (let i = 0; i < this.maxBits / 4; i += 1) {
+      for (let i = 0; i < this.maxBits / (4 * this.lsbCount); i += 1) {
         const { x, y } = this.getNthCoordinate(i, this.host);
         const { r, g, b, a } = this.getPixel(x, y, this.canvas.new);
 
-        bits.push(r & 0b1);
-        bits.push(g & 0b1);
-        bits.push(b & 0b00000001);
-        bits.push(a & 0b00000001);
+        if (this.lsbCount === 1) {
+          bits.push(r & 0b01);
+          bits.push(g & 0b01);
+          bits.push(b & 0b01);
+          bits.push(a & 0b01);
+        }
+
+        if (this.lsbCount === 2) {
+          bits.push((r & 0b10) >> 1);
+          bits.push(r & 0b01);
+          bits.push((g & 0b10) >> 1);
+          bits.push(g & 0b01);
+          bits.push((b & 0b10) >> 1);
+          bits.push(b & 0b01);
+          bits.push((a & 0b10) >> 1);
+          bits.push(a & 0b01);
+        }
       }
 
       console.log('decode', bits);
