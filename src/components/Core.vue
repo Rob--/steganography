@@ -1,11 +1,109 @@
 <template>
-  <div id="canvas">
+  <div>
+    <div v-show="finished.encoding && finished.decoding">
+      <div class="details">
+        <div>
+          <h3>How does it work?</h3>
+          <p>
+            Every pixel in an image contains 4 channels: red, green, blue and alpha.
+            Each channel describes how much of that colour should be displayed, while alpha
+            describes the opacity of the channel.  
+          </p>
 
+          <p>
+            Each channel uses 1 byte (8 bits) to represent the value.
+            This means each channel has a maximum value of 255.
+            For example, take the binary value <code>11010101</code>,
+            that has a decimal value of <code>213</code>. By using
+            the least significant bit (right most bit), we can set that bit
+            to any value we want and the value only changes by either <code>+1</code>
+            or <code>-1</code>: <code>11010100 = 212</code>.
+          </p>
+
+          <p>
+            Take the following colour:
+            <pre class="code" style="background-color: rgba(167, 243, 229, 255)">rgba(167, 243, 229, 255);<br>rgba(0b10100111, 0b11110011, 0b11100101, 0b11111111);</pre>
+            Set the least significant bit of each channel to <code>0</code>:
+            <pre class="code" style="background-color: rgba(166, 242, 228, 254)">rgba(166, 242, 228, 254);<br>rgba(0b10100110, 0b11110010, 0b11100100, 0b11111110);</pre>
+            The colours look identical, however we have now essentially saved
+            4 bits of information in this 1 pixel. This means to save 1 byte of
+            data would require using 2 pixels.
+          </p>
+          <p>
+            We can apply the same logic but use the 2 or 3 least significant bits instead
+            of just 1, this will fluctuate the true value by <code>3</code> when using 2
+            least significant bits, or <code>7</code> using 3.
+          </p>
+
+          <p>
+            Take the following colour:
+            <pre class="code" style="background-color: rgba(240, 160, 184, 248)">rgba(240, 160, 184, 248);<br>rgba(0b11110000, 0b10100000, 0b10111000, 0b11111000);</pre>
+            Set the three least significant bits of each channel to <code>1</code>:
+            <pre class="code" style="background-color: rgba(247, 167, 191, 255)">rgba(247, 167, 191, 255);<br>rgba(0b11110111, 0b10100111, 0b10111111, 0b11111111);</pre>
+            It is still difficult to see a difference even when using 3 of the least significant
+            bits to store data. By using more bits, we can save more data inside of an image.
+            The downside is that the more bits you override from the original image, the worse the
+            encoded image will come out and the more quality will be lost.
+          </p>
+        </div>
+
+        <!-- <div>
+          <h3>Settings</h3>
+          <div>
+            <div>
+              <p>Number of LSB:</p>
+            </div>
+            <div>
+              <button class="btn btn-primary" @click="lsbCount > 1 && lsbCount--">-</button>
+                {{ lsbCount }}
+              <button class="btn btn-primary" @click="lsbCount < 8 && lsbCount++">+</button>
+            </div>
+          </div>
+        </div> -->
+      </div>
+
+      <hr>
+
+      <div class="part">
+        <div class="text">
+          <h3>encoded image</h3>
+          <h6>this image has the hidden image inside of it</h6>
+        </div>
+        <div class="canvas" id="new"></div>
+      </div>
+
+      <div class="part">
+        <div class="text">
+          <h3>decoded image</h3>
+          <h6>this image has been extracted from the image above</h6>
+        </div>
+        <div class="canvas" id="extracted"></div>
+      </div>
+    </div>
+
+    <div v-if="!finished.encoding || !finished.decoding" class="progress">
+      <h3>encoding</h3>
+      <h6>hiding asset inside the host...</h6>
+
+      <div class="bar bar-sm">
+        <div :style="{ width: `${progress.encoding}%`}" class="bar-item" role="progressbar" aria-valuemin="0" aria-valuemax="100"></div>
+      </div>
+    </div>
+
+    <div v-if="finished.encoding && !finished.decoding" class="progress">
+      <h3>decoding</h3>
+      <h6>extracting asset from the host...</h6>
+
+      <div class="bar bar-sm">
+        <div :style="{ width: `${progress.decoding}%`}" class="bar-item" role="progressbar" aria-valuemin="0" aria-valuemax="100"></div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 import { mapState } from 'vuex';
+import Worker from 'worker-loader!@/core';
 
 export default {
   name: 'Core',
@@ -25,7 +123,15 @@ export default {
       height: 0,
       width: 0,
       maxBits: 0,
-      lsbCount: 2,
+      lsbCount: 1,
+      finished: {
+        encoding: false,
+        decoding: false,
+      },
+      progress: {
+        encoding: 0,
+        decoding: 0,
+      },
     };
   },
   mounted() {
@@ -41,7 +147,7 @@ export default {
     this.canvas.extracted = document.createElement('canvas');
     this.canvas.extracted.width = this.asset.width;
     this.canvas.extracted.height = this.asset.height;
-    document.querySelector('#canvas').prepend(this.canvas.extracted);
+    document.querySelector('#extracted').append(this.canvas.extracted);
 
     this.width = this.host.width;
     this.height = this.host.height;
@@ -59,177 +165,58 @@ export default {
         this.loaded[target] = true;
 
         if (target === 'new') {
-          document.querySelector('#canvas').append(this.canvas.new);
+          document.querySelector('#new').append(this.canvas.new);
         }
 
         if (this.loaded.host && this.loaded.asset && this.loaded.new) {
-          this.encode();
+          this.work();
+          // this.encode();
         }
       };
     },
-    getPixel(x, y, canvas) {
-      const data = canvas.getContext('2d').getImageData(x, y, 1, 1).data;
-      return {
-        r: data[0],
-        g: data[1],
-        b: data[2],
-        a: data[3],
-      };
-    },
-    setPixel(x, y, canvas, { r, g, b, a }) {
-      const imageData = new ImageData(1, 1);
-      imageData.data[0] = r;
-      imageData.data[1] = g;
-      imageData.data[2] = b;
-      imageData.data[3] = a;
-      canvas.getContext('2d').putImageData(imageData, x, y);
-    },
-    getNthCoordinate(n, file) {
-      const x = n % file.width;
-      const y = Math.floor(n / file.width);
-      return { x, y };
-    },
-    getPixelBits(pixel, ignoreAlpha = false) {
-      // map (pixel = { r, g, b, a }) each channel to binary and spread bits
-      const bits = Object.values(pixel).map((channel) => {
-        const binary = channel.toString(2).padStart(8, '0');
-        return binary.split('').map(Number);
-      }).reduce((a, b) => [...a, ...b]);
+    work() {
+      // const worker = new Worker(URL.createObjectURL(new Blob(['('+core+')()'])));
+      const worker = new Worker();
 
-      if (ignoreAlpha) {
-        // last 8 bits are the alpha channel
-        return bits.slice(0, 8 * 3);
-      }
-
-      return bits;
-    },
-    getImageBits(file, canvas, maxPixels, ignoreAlpha = false) {
-      let bits = [];
-
-      for (let i = 0; i < 10; i += 1) {
-        const { x, y } = this.getNthCoordinate(i, file);
-        const pixel = this.getPixel(x, y, canvas);
-        bits = [...bits, ...this.getPixelBits(pixel, ignoreAlpha)];
-      }
-
-      const maxBits = maxPixels * 8;
-      return bits.slice(0, maxBits);
-    },
-    getMask(lsbIndex) {
-      // const mask = ''.padStart(8, '1').slice(0, 8 - numberOfLSB).padEnd(8, '0');
-      // return parseInt(mask, 2);
-      return 1 << lsbIndex;
-    },
-    encode() {
-      const bitsPerByte = 8;
-      const pixelsPerByte = (bitsPerByte / this.lsbCount);
-      const maxPixels = Math.floor((this.host.width * this.host.height) / pixelsPerByte);
-
-      const bits = this.getImageBits(this.asset, this.canvas.asset, maxPixels);
-      console.log('encode', bits);
-      this.maxBits = bits.length;
-
-      for (let i = 0, j = 0; i < bits.length; i += (4 * this.lsbCount), j += 1) {
-        const { x, y } = this.getNthCoordinate(j, this.host);
-        let { r, g, b, a } = this.getPixel(x, y, this.canvas.host);
-
-        /*
-          Every pixel contains 4 channels that describe the colour (rgba).
-          Each channel is 1 byte (8 bits = 0b00000000).
-          Therefore we can make use of the least significant bits (LSBs) of each
-          channel by storing our own data inside the LSBS.
-          Imagine a single channel (red for example), has the value 125.
-          125 in binary is 0b1111101, by editing the least significant bit to store a single
-          bit of data, we fluctuate the value of 125 to 124 (0b1111100) by clearing the LSB,
-          and at most we increase the value by 1 if the LSB was already 0.
-
-          We can also use this method to take advantage of the 2 least significant bits
-          that will ultimately result in a maximum fluctuation of either positive or negative 3
-          as 0b11 = 3.
-
-          To take advantage of 1 lsb:
-          We just check if the value of the LSB is the same value as the bit we
-          want to store, if not we flip the singular bit via bitwise operations.
-
-          To take advantage of 2 lsb:
-          We use a mask 0f 0b10 instead of 0b01, and shift bitwise shift right by 1 place
-          (as 0b10 would extract a value of 2 instead of 1 and our equality check of !== would fail).
-        */
-
-        // Iterate over every channel and apply encoding dynamically depending on LSB count
-        const channels = [r, g, b, a].map((channel, index) => {
-          for (let k = 0; k < this.lsbCount; k++) {
-            // We want to encode the greatest LSB first hence, e.g. if LSB count is 2
-            // 2 - 1 - k produces (1, 0) for the mask indexes which generate (0b10, 0b01)
-            const mask = this.getMask(this.lsbCount - 1 - k);
-
-            // Calculate the necessary index for the bit, just iterates from 0 to bits.length
-            // over the life span of all the loops
-            const bit = bits[i + (index * this.lsbCount) + k];
-
-            // (channel & mask) extracts the bit we want,
-            // bit shift moves it to LSB column (e.g. if we extract 2nd LSB index we get 0b10 which is 2),
-            // bit shift that to 0b01 and we get 1 (bit to be set is either 1 or 0)
-            if (bit !== ((channel & mask) >> (this.lsbCount - 1 - k))) {
-              channel ^= mask;
-            }
-          }
-
-          return channel;
-        });
-
-        this.setPixel(x, y, this.canvas.new, {
-          r: channels[0],
-          g: channels[1],
-          b: channels[2],
-          a: channels[3],
-        });
-      }
-
-      this.decode();
-    },
-    decode() {
-      const bits = [];
-      for (let i = 0; i < this.maxBits / (4 * this.lsbCount); i += 1) {
-        const { x, y } = this.getNthCoordinate(i, this.host);
-        const { r, g, b, a } = this.getPixel(x, y, this.canvas.new);
-
-        [r, g, b, a].forEach((channel, index) => {
-          for (let j = 0; j < this.lsbCount; j += 1) {
-            const mask = this.getMask(this.lsbCount - 1 - j);
-            
-            bits.push((channel & mask) >> (this.lsbCount - 1 - j));
-          }
-        });
-      }
-
-      console.log('decode', bits);
-
-      const bytes = [];
-      for (let i = 0; i < bits.length; i += 8) {
-        let binary = '';
-        for (let j = 0; j < 8; j += 1) {
-          binary += String(bits[i + j]);
+      worker.addEventListener('message', ({ data }) => {
+        if (data.encode) {
+          this.progress.encoding = data.encode;
         }
-        bytes.push(parseInt(binary, 2));
-      }
 
-      const pixels = [];
-      for (let i = 0; i < bytes.length; i += 4) {
-        pixels.push({
-          r: bytes[i],
-          g: bytes[i + 1],
-          b: bytes[i + 2],
-          a: bytes[i + 3],
-        });
-      }
+        if (data.encode && data.encode === 100) {
+          this.finished.encoding = true;
+        }
 
-      for (let i = 0; i < pixels.length; i += 1) {
-        const { x, y } = this.getNthCoordinate(i, this.asset);
-        this.setPixel(x, y, this.canvas.extracted, pixels[i]);
-      }
+        if (data.decode) {
+          this.progress.decoding = data.decode;
+        }
 
-      console.log('done');
+        if (data.decode && data.decode === 100) {
+          this.finished.decoding = true;
+        }
+
+        if (data.imageData) {
+          this.canvas.new.getContext('2d').putImageData(data.imageData.new, 0, 0);
+          this.canvas.extracted.getContext('2d').putImageData(data.imageData.extracted, 0, 0);
+        }
+      });
+
+      worker.postMessage({
+        lsbCount: this.lsbCount,
+        host: this.host,
+        asset: this.asset,
+        imageData: {
+          host: this.canvas.host.getContext('2d').getImageData(0, 0, this.host.width, this.host.height),
+          asset: this.canvas.asset.getContext('2d').getImageData(0, 0, this.asset.width, this.asset.height),
+          new: this.canvas.new.getContext('2d').getImageData(0, 0, this.host.width, this.host.height),
+          extracted: this.canvas.extracted.getContext('2d').getImageData(0, 0, this.asset.width, this.asset.height),
+        },
+        files: {
+          host: this.host,
+          asset: this.asset,
+        },
+        maxBits: this.maxBits,
+      });
     },
   },
   computed: {
@@ -242,5 +229,32 @@ export default {
 </script>
 
 <style scoped>
+.progress {
+  padding: 50px;
+}
 
+.details {
+  display: flex;
+  padding: 0 20%;
+}
+
+.details > div {
+  flex: 1;
+}
+
+pre {
+  margin: 10px 0;
+}
+
+hr {
+  width: 80%;
+  background-color: #0000001c;
+  height: 2px;
+}
+</style>
+
+<style>
+canvas {
+  box-shadow: 2px 2px 10px 0px #00000061 !important;
+}
 </style>

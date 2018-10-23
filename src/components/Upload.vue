@@ -84,11 +84,12 @@ h5 {
   display: flex;
   flex-direction: row;
   padding: 0px 200px;
+  margin: 20px 0px 0px 20px;
 }
 
 .dropzone-box > .text {
   margin: auto 0 auto 0;
-  padding: 50px;
+  /* padding: 50px; */
   flex: 1;
 }
 
@@ -99,11 +100,11 @@ h5 {
 
 .overlay {
   position: absolute;
-    left: 0;
-    top: 0;
-    height: 100%;
-    width: 100%;
-    margin: auto;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 100%;
+  margin: auto;
 }
 
 .overlay > .btn {
