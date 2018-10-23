@@ -64,7 +64,7 @@ this.getMask = function getMask(lsbIndex) {
 this.encode = () => {
   const bitsPerByte = 8;
   const pixelsPerByte = (bitsPerByte / this.lsbCount);
-  const maxPixels = Math.floor((this.host.width * this.host.height) / pixelsPerByte);
+  const maxPixels = Math.floor((this.files.host.width * this.files.host.height) / pixelsPerByte);
 
   const bits = this.getImageBits(this.files.asset, this.imageData.asset, maxPixels);
   console.log('encode', bits);
@@ -75,13 +75,13 @@ this.encode = () => {
     const { x, y } = this.getNthCoordinate(j, this.files.host);
     const { r, g, b, a } = this.getPixel(x, y, this.imageData.host, this.files.host);
 
-    const pct = (i / bits.length) * 100;
-    if (Math.ceil(pct) !== progress) {
-      self.postMessage({
-        encode: pct,
-      });
-      progress = Math.ceil(pct);
-    }
+    // const pct = (i / bits.length) * 100;
+    // if (Math.ceil(pct) !== progress) {
+    //   self.postMessage({
+    //     encode: pct,
+    //   });
+    //   progress = Math.ceil(pct);
+    // }
 
     /*
       Every pixel contains 4 channels that describe the colour (rgba).
@@ -148,7 +148,7 @@ this.encode = () => {
 this.decode = () => {
   const bits = [];
   for (let i = 0; i < this.maxBits / (4 * this.lsbCount); i += 1) {
-    const { x, y } = this.getNthCoordinate(i, this.host);
+    const { x, y } = this.getNthCoordinate(i, this.files.host);
     const { r, g, b, a } = this.getPixel(x, y, this.imageData.new, this.files.host);
 
     [r, g, b, a].forEach((channel) => {
@@ -158,9 +158,9 @@ this.decode = () => {
       }
     });
 
-    self.postMessage({
-      decode: ((i / (this.maxBits / (4 * this.lsbCount))) * 100) / 4,
-    });
+    // self.postMessage({
+    //   decode: ((i / (this.maxBits / (4 * this.lsbCount))) * 100) / 4,
+    // });
   }
 
   self.postMessage({
@@ -177,14 +177,14 @@ this.decode = () => {
     }
     bytes.push(parseInt(binary, 2));
 
-    self.postMessage({
-      decode: 25 + (((i / bits.length) * 100) / 4),
-    });
+    // self.postMessage({
+    //   decode: 25 + (((i / bits.length) * 100) / 4),
+    // });
   }
 
-  self.postMessage({
-    decode: 50,
-  });
+  // self.postMessage({
+  //   decode: 50,
+  // });
 
   const pixels = [];
   for (let i = 0; i < bytes.length; i += 4) {
@@ -195,22 +195,22 @@ this.decode = () => {
       a: bytes[i + 3],
     });
 
-    self.postMessage({
-      decode: 50 + (((i / bytes.length) * 100) / 4),
-    });
+    // self.postMessage({
+    //   decode: 50 + (((i / bytes.length) * 100) / 4),
+    // });
   }
 
-  self.postMessage({
-    decode: 75,
-  });
+  // self.postMessage({
+  //   decode: 75,
+  // });
 
   for (let i = 0; i < pixels.length; i += 1) {
     const { x, y } = this.getNthCoordinate(i, this.files.asset);
     this.setPixel(x, y, this.imageData.extracted, this.files.asset, pixels[i]);
 
-    self.postMessage({
-      decode: 75 + (((i / pixels.length) * 100) / 4),
-    });
+    // self.postMessage({
+    //   decode: 75 + (((i / pixels.length) * 100) / 4),
+    // });
   }
 
   self.postMessage({
@@ -228,11 +228,9 @@ this.decode = () => {
 };
 
 self.addEventListener('message', ({ data }) => {
-  const { lsbCount, host, asset, imageData, files, maxBits } = data;
+  const { lsbCount, imageData, files, maxBits } = data;
 
   this.lsbCount = lsbCount;
-  this.host = host;
-  this.asset = asset;
   this.imageData = imageData;
   this.files = files;
   this.maxBits = maxBits;

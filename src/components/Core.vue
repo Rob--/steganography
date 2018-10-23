@@ -203,8 +203,6 @@ export default {
 
       worker.postMessage({
         lsbCount: this.lsbCount,
-        host: this.host,
-        asset: this.asset,
         imageData: {
           host: this.canvas.host.getContext('2d').getImageData(0, 0, this.host.width, this.host.height),
           asset: this.canvas.asset.getContext('2d').getImageData(0, 0, this.asset.width, this.asset.height),
