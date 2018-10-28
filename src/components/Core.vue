@@ -4,10 +4,16 @@
       <div class="details">
         <div>
           <h3>How does it work?</h3>
+          <blockquote style="text-align: left">
+            steganography, noun
+            <br>
+            <i>the practice of concealing messages or information within other non-secret text or data.</i>
+          </blockquote>
+          <br>
           <p>
             Every pixel in an image contains 4 channels: red, green, blue and alpha.
             Each channel describes how much of that colour should be displayed, while alpha
-            describes the opacity of the channel.  
+            describes the opacity of the channel.
           </p>
 
           <p>
@@ -22,8 +28,10 @@
 
           <p>
             Take the following colour:
+            <!-- eslint-disable-next-line max-len -->
             <pre class="code" style="background-color: rgba(167, 243, 229, 255)">rgba(167, 243, 229, 255);<br>rgba(0b10100111, 0b11110011, 0b11100101, 0b11111111);</pre>
             Set the least significant bit of each channel to <code>0</code>:
+            <!-- eslint-disable-next-line max-len -->
             <pre class="code" style="background-color: rgba(166, 242, 228, 254)">rgba(166, 242, 228, 254);<br>rgba(0b10100110, 0b11110010, 0b11100100, 0b11111110);</pre>
             The colours look identical, however we have now essentially saved
             4 bits of information in this 1 pixel. This means to save 1 byte of
@@ -31,20 +39,30 @@
           </p>
           <p>
             We can apply the same logic but use the 2 or 3 least significant bits instead
-            of just 1, this will fluctuate the true value by <code>3</code> when using 2
-            least significant bits, or <code>7</code> using 3.
+            of just 1, this will fluctuate the true value by a maximum of <code>3</code>
+            when using 2 least significant bits, or <code>7</code> using 3.
           </p>
 
           <p>
             Take the following colour:
+            <!-- eslint-disable-next-line max-len -->
             <pre class="code" style="background-color: rgba(240, 160, 184, 248)">rgba(240, 160, 184, 248);<br>rgba(0b11110000, 0b10100000, 0b10111000, 0b11111000);</pre>
             Set the three least significant bits of each channel to <code>1</code>:
+            <!-- eslint-disable-next-line max-len -->
             <pre class="code" style="background-color: rgba(247, 167, 191, 255)">rgba(247, 167, 191, 255);<br>rgba(0b11110111, 0b10100111, 0b10111111, 0b11111111);</pre>
             It is still difficult to see a difference even when using 3 of the least significant
             bits to store data. By using more bits, we can save more data inside of an image.
             The downside is that the more bits you override from the original image, the worse the
             encoded image will come out and the more quality will be lost.
           </p>
+
+          <p>
+            We can then use this theory to convert a given image into
+            an array of bits, and write each of those bits into the least
+            significant bits of whatever image we want to hide the given image
+            inside of.
+          </p>
+          
         </div>
 
         <!-- <div>
@@ -79,6 +97,17 @@
         </div>
         <div class="canvas" id="extracted"></div>
       </div>
+
+      <hr>
+
+      <div class="part">
+        <div class="text">
+          <p>
+            {{ bits.toLocaleString() }} bits written into the
+            original image using {{ lsbCount }} least significant bit(s)
+          </p>
+        </div>
+      </div>
     </div>
 
     <div v-if="!finished.encoding || !finished.decoding" class="progress">
@@ -86,7 +115,8 @@
       <h6>hiding asset inside the host...</h6>
 
       <div class="bar bar-sm">
-        <div :style="{ width: `${progress.encoding}%`}" class="bar-item" role="progressbar" aria-valuemin="0" aria-valuemax="100"></div>
+        <div :style="{ width: `${progress.encoding}%`}"
+          class="bar-item" role="progressbar" aria-valuemin="0" aria-valuemax="100"></div>
       </div>
     </div>
 
@@ -95,7 +125,8 @@
       <h6>extracting asset from the host...</h6>
 
       <div class="bar bar-sm">
-        <div :style="{ width: `${progress.decoding}%`}" class="bar-item" role="progressbar" aria-valuemin="0" aria-valuemax="100"></div>
+        <div :style="{ width: `${progress.decoding}%`}"
+          class="bar-item" role="progressbar" aria-valuemin="0" aria-valuemax="100"></div>
       </div>
     </div>
   </div>
@@ -122,7 +153,6 @@ export default {
       },
       height: 0,
       width: 0,
-      maxBits: 0,
       lsbCount: 1,
       finished: {
         encoding: false,
@@ -213,7 +243,6 @@ export default {
           host: this.host,
           asset: this.asset,
         },
-        maxBits: this.maxBits,
       });
     },
   },
@@ -222,6 +251,9 @@ export default {
       host: state => state.files.host,
       asset: state => state.files.asset,
     }),
+    bits() {
+      return this.asset.width * this.asset.height * 4 * 8;
+    },
   },
 };
 </script>
@@ -254,5 +286,6 @@ hr {
 <style>
 canvas {
   box-shadow: 2px 2px 10px 0px #00000061 !important;
+  margin: 20px 0;
 }
 </style>

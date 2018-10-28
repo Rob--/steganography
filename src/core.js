@@ -44,7 +44,7 @@ this.getPixelBits = (pixel, ignoreAlpha = false) => {
 this.getImageBits = (file, imageData, maxPixels, ignoreAlpha = false) => {
   const bits = [];
 
-  for (let i = 0; i < 6000; i += 1) {
+  for (let i = 0; i < (file.width * file.height); i += 1) {
     const { x, y } = this.getNthCoordinate(i, file);
     const pixel = this.getPixel(x, y, imageData, file);
     // bits = [...bits, ...this.getPixelBits(pixel, ignoreAlpha)];
@@ -63,13 +63,16 @@ this.getMask = function getMask(lsbIndex) {
 
 this.encode = () => {
   const bitsPerByte = 8;
+  // number of pixels needed to store 1 byte
   const pixelsPerByte = (bitsPerByte / this.lsbCount);
-  const maxPixels = Math.floor((this.files.host.width * this.files.host.height) / pixelsPerByte);
+  const maxPixels = Math.floor((this.files.host.width * this.files.host.height * 4) / pixelsPerByte);
+
+  console.log(maxPixels, this.files.host.width * this.files.host.height * 4 * 8);
 
   const bits = this.getImageBits(this.files.asset, this.imageData.asset, maxPixels);
   console.log('encode', bits);
   this.maxBits = bits.length;
-  let progress = 0;
+  // let progress = 0;
 
   for (let i = 0, j = 0; i < bits.length; i += (4 * this.lsbCount), j += 1) {
     const { x, y } = this.getNthCoordinate(j, this.files.host);
@@ -182,9 +185,9 @@ this.decode = () => {
     // });
   }
 
-  // self.postMessage({
-  //   decode: 50,
-  // });
+  self.postMessage({
+    decode: 50,
+  });
 
   const pixels = [];
   for (let i = 0; i < bytes.length; i += 4) {
@@ -200,9 +203,9 @@ this.decode = () => {
     // });
   }
 
-  // self.postMessage({
-  //   decode: 75,
-  // });
+  self.postMessage({
+    decode: 75,
+  });
 
   for (let i = 0; i < pixels.length; i += 1) {
     const { x, y } = this.getNthCoordinate(i, this.files.asset);
@@ -223,17 +226,14 @@ this.decode = () => {
       extracted: this.imageData.extracted,
     },
   });
-
-  console.log('done');
 };
 
 self.addEventListener('message', ({ data }) => {
-  const { lsbCount, imageData, files, maxBits } = data;
+  const { lsbCount, imageData, files } = data;
 
   this.lsbCount = lsbCount;
   this.imageData = imageData;
   this.files = files;
-  this.maxBits = maxBits;
 
   this.encode();
 });
