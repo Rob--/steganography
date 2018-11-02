@@ -53,7 +53,12 @@ export default {
     },
 
     start() {
-      this.$router.push({ name: 'core' });
+      this.$router.push({
+        name: 'core',
+        params: {
+          lsb: 1,
+        },
+      });
     },
   },
   computed: {

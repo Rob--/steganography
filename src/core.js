@@ -65,9 +65,9 @@ this.encode = () => {
   const bitsPerByte = 8;
   // number of pixels needed to store 1 byte
   const pixelsPerByte = (bitsPerByte / this.lsbCount);
-  const maxPixels = Math.floor((this.files.host.width * this.files.host.height * 4) / pixelsPerByte);
-
-  console.log(maxPixels, this.files.host.width * this.files.host.height * 4 * 8);
+  // number of bytes we have available to encode
+  const bytes = (this.files.host.width * this.files.host.height * 4);
+  const maxPixels = Math.floor(bytes / pixelsPerByte);
 
   const bits = this.getImageBits(this.files.asset, this.imageData.asset, maxPixels);
   console.log('encode', bits);
